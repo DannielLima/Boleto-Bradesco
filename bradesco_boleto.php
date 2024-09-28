@@ -4,16 +4,51 @@ require 'vendor/autoload.php';
 
 use OpenBoleto\Banco\Bradesco;
 use OpenBoleto\Agente;
+use Dompdf\Dompdf;
+
+// Validações para garantir que os dados sejam válidos
+function validarCPF($cpf)
+{
+    $cpf = preg_replace('/[^0-9]/', '', $cpf);
+    if (strlen($cpf) != 11 || preg_match('/(\d)\1{10}/', $cpf)) {
+        return false;
+    }
+    for ($t = 9; $t < 11; $t++) {
+        for ($d = 0, $c = 0; $c < $t; $c++) {
+            $d += $cpf[$c] * (($t + 1) - $c);
+        }
+        $d = ((10 * $d) % 11) % 10;
+        if ($cpf[$c] != $d) {
+            return false;
+        }
+    }
+    return true;
+}
 
 // Dados do formulário
 $nome = $_POST['nome'];
 $cpf = $_POST['cpf'];
+$email = $_POST['email'];
+$telefone = $_POST['telefone'];
 $endereco = $_POST['endereco'];
 $cidade = $_POST['cidade'];
 $estado = $_POST['estado'];
 $cep = $_POST['cep'];
 $valor = $_POST['valor'];
 $vencimento = $_POST['vencimento'];
+
+// Validação dos campos em PHP
+if (!validarCPF($cpf)) {
+    die("CPF inválido.");
+}
+
+if ($valor <= 0) {
+    die("O valor do boleto deve ser maior que zero.");
+}
+
+if ($vencimento < date('Y-m-d')) {
+    die("A data de vencimento deve ser posterior à data atual.");
+}
 
 // Criando o pagador (Cliente)
 $pagador = new Agente(
@@ -42,15 +77,26 @@ $boleto = new Bradesco(array(
     'sequencial' => 1234567,
     'sacado' => $pagador,
     'cedente' => $beneficiario,
-    'agencia' => '1234',
-    'carteira' => '09',
-    'conta' => '12345',
-    'contaDv' => '6',
-    'descricaoDemonstrativo' => ['Compra de produtos ou serviços'],
-    'instrucoes' => [
-        'Após o vencimento, cobrar 2% de multa e 1% de juros ao mês.',
-        'Não receber após 30 dias do vencimento.',
-    ],
+    'agencia' => 1234,
+    'carteira' => 06,
+    'conta' => 56789,
+    'convenio' => 123456,
 ));
 
-echo $boleto->getOutput();
+// Gerar HTML do boleto
+$htmlBoleto = '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boleto Bradesco</title>
+</head>
+<body>' . $boleto->getOutput() . '</body>
+</html>';
+
+// Geração do PDF
+$dompdf = new Dompdf();
+$dompdf->loadHtml($htmlBoleto);
+$dompdf->setPaper('A4', 'portrait');
+$dompdf->render();
+$dompdf->stream("boleto_bradesco.pdf", array("Attachment" => false));
