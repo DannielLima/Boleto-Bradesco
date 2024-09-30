@@ -1,6 +1,7 @@
 {
     "require": {
         "openboleto/openboleto": "^1.0",
-        "dompdf/dompdf": "^3.0"
+        "dompdf/dompdf": "^3.0",
+        "milon/barcode": "^11.0"
     }
 }

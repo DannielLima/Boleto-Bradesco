@@ -7,4 +7,5 @@ $baseDir = dirname($vendorDir);
 
 return array(
     'OpenBoleto\\' => array($vendorDir . '/openboleto/openboleto/src'),
+    'Milon\\Barcode' => array($vendorDir . '/milon/barcode/src'),
 );

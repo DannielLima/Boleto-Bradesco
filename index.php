@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerar Boleto Bradesco</title>
+    <title>Boleto Bradesco</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -11,117 +12,120 @@
             padding: 20px;
             max-width: 800px;
         }
+
         label {
             font-weight: bold;
         }
+
         .form-group {
             margin-bottom: 10px;
         }
+
         .error {
             color: red;
         }
     </style>
     <script>
-        function validarFormulario() {
-            let cpf = document.getElementById('cpf').value;
-            let valor = document.getElementById('valor').value;
-            let vencimento = document.getElementById('vencimento').value;
-            let dataAtual = new Date().toISOString().split('T')[0];
+        document.addEventListener("DOMContentLoaded", function() {
+            const form = document.querySelector('form');
 
-            if (!validarCPF(cpf)) {
-                alert("CPF/CNPJ inválido!");
-                return false;
+            form.addEventListener('submit', function(event) {
+                if (!validarFormulario()) {
+                    event.preventDefault(); // Impede o envio do formulário se houver erros
+                }
+            });
+
+            function validarFormulario() {
+                const cpf = document.getElementById('cpf').value;
+                const valor = parseFloat(document.getElementById('valor').value);
+                const vencimento = document.getElementById('vencimento').value;
+                const dataAtual = new Date().toISOString().split('T')[0];
+
+                if (!validarCPF(cpf)) {
+                    alert("CPF/CNPJ inválido!");
+                    return false;
+                }
+
+                if (valor <= 0) {
+                    alert("O valor do boleto deve ser maior que zero!");
+                    return false;
+                }
+
+                if (vencimento < dataAtual) {
+                    alert("A data de vencimento deve ser posterior à data atual!");
+                    return false;
+                }
+
+                return true;
             }
 
-            if (valor <= 0) {
-                alert("O valor do boleto deve ser maior que zero!");
-                return false;
+            function validarCPF(cpf) {
+                cpf = cpf.replace(/[^\d]+/g, '');
+
+                if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) {
+                    return false;
+                }
+
+                return validarDigitosCPF(cpf);
             }
 
-            if (vencimento < dataAtual) {
-                alert("A data de vencimento deve ser posterior à data atual!");
-                return false;
+            function validarDigitosCPF(cpf) {
+                const primeiroDigito = calcularDigito(cpf, 9);
+                const segundoDigito = calcularDigito(cpf, 10);
+
+                return (
+                    primeiroDigito === parseInt(cpf.charAt(9)) &&
+                    segundoDigito === parseInt(cpf.charAt(10))
+                );
             }
 
-            return true;
-        }
-
-        function validarCPF(cpf) {
-            cpf = cpf.replace(/[^\d]+/g, '');
-            if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) {
-                return false;
+            function calcularDigito(cpf, tamanho) {
+                let soma = 0;
+                for (let i = 0; i < tamanho; i++) {
+                    soma += parseInt(cpf.charAt(i)) * (tamanho + 1 - i);
+                }
+                let resto = soma % 11;
+                return resto < 2 ? 0 : 11 - resto;
             }
-            let soma = 0, resto;
-            for (let i = 1; i <= 9; i++) soma += parseInt(cpf.substring(i-1, i)) * (11 - i);
-            resto = (soma * 10) % 11;
-            if (resto === 10 || resto === 11) resto = 0;
-            if (resto !== parseInt(cpf.substring(9, 10))) return false;
-
-            soma = 0;
-            for (let i = 1; i <= 10; i++) soma += parseInt(cpf.substring(i-1, i)) * (12 - i);
-            resto = (soma * 10) % 11;
-            if (resto === 10 || resto === 11) resto = 0;
-            return resto === parseInt(cpf.substring(10, 11));
-        }
+        });
     </script>
 </head>
+
 <body>
     <h1>Gerar Boleto Bradesco</h1>
 
-    <form action="bradesco_boleto.php" method="post" onsubmit="return validarFormulario();">
+    <form action="bradesco_boleto.php" method="post">
         <!-- Dados do Cliente -->
-        <div class="form-group">
-            <label for="nome">Nome do Cliente:</label>
-            <input type="text" id="nome" name="nome" required>
-        </div>
-
-        <div class="form-group">
-            <label for="cpf">CPF/CNPJ:</label>
-            <input type="text" id="cpf" name="cpf" required>
-        </div>
-
-        <div class="form-group">
-            <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required>
-        </div>
-
-        <div class="form-group">
-            <label for="telefone">Telefone:</label>
-            <input type="tel" id="telefone" name="telefone" required>
-        </div>
-
-        <div class="form-group">
-            <label for="endereco">Endereço:</label>
-            <input type="text" id="endereco" name="endereco" required>
-        </div>
-
-        <div class="form-group">
-            <label for="cidade">Cidade:</label>
-            <input type="text" id="cidade" name="cidade" required>
-        </div>
-
-        <div class="form-group">
-            <label for="estado">Estado (UF):</label>
-            <input type="text" id="estado" name="estado" maxlength="2" required>
-        </div>
-
-        <div class="form-group">
-            <label for="cep">CEP:</label>
-            <input type="text" id="cep" name="cep" required>
-        </div>
+        <?php echo renderInput('Nome do Cliente', 'nome', 'text', true); ?>
+        <?php echo renderInput('CPF/CNPJ', 'cpf', 'text', true); ?>
+        <?php echo renderInput('Email', 'email', 'email', true); ?>
+        <?php echo renderInput('Telefone', 'telefone', 'tel', true); ?>
+        <?php echo renderInput('Endereço', 'endereco', 'text', true); ?>
+        <?php echo renderInput('Cidade', 'cidade', 'text', true); ?>
+        <?php echo renderInput('Estado (UF)', 'estado', 'text', true, 2); ?>
+        <?php echo renderInput('CEP', 'cep', 'text', true); ?>
 
         <!-- Dados do Boleto -->
-        <div class="form-group">
-            <label for="valor">Valor do Boleto (R$):</label>
-            <input type="number" id="valor" name="valor" step="0.01" required>
-        </div>
+        <?php echo renderInput('Valor do Boleto (R$)', 'valor', 'number', true, null, 'step="0.01"'); ?>
+        <?php echo renderInput('Data de Vencimento', 'vencimento', 'date', true); ?>
 
-        <div class="form-group">
-            <label for="vencimento">Data de Vencimento:</label>
-            <input type="date" id="vencimento" name="vencimento" required>
-        </div>
-
-        <button type="submit">Gerar Boleto Bradesco</button>
+        <button type="submit">Gerar Boleto</button>
     </form>
 </body>
+
 </html>
+
+<?php
+function renderInput($label, $name, $type = 'text', $required = false, $maxlength = null, $additionalAttributes = '')
+{
+    $requiredAttr = $required ? 'required' : '';
+    $maxlengthAttr = $maxlength ? "maxlength=\"$maxlength\"" : '';
+
+    return "
+        <div class=\"form-group\">
+            <label for=\"$name\">$label:</label>
+            <input type=\"$type\" id=\"$name\" name=\"$name\" $requiredAttr $maxlengthAttr $additionalAttributes>
+        </div>
+    ";
+}
+?>

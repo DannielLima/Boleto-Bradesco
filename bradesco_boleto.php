@@ -6,85 +6,85 @@ use OpenBoleto\Banco\Bradesco;
 use OpenBoleto\Agente;
 use Dompdf\Dompdf;
 
-// Validações para garantir que os dados sejam válidos
+/**
+ * Valida o CPF
+ * 
+ * @param string $cpf CPF a ser validado
+ * @return bool Retorna true se o CPF for válido, caso contrário, false
+ */
 function validarCPF($cpf)
 {
     $cpf = preg_replace('/[^0-9]/', '', $cpf);
-    if (strlen($cpf) != 11 || preg_match('/(\d)\1{10}/', $cpf)) {
+
+    // Verifica o tamanho e se é uma sequência repetida
+    if (strlen($cpf) !== 11 || preg_match('/(\d)\1{10}/', $cpf)) {
         return false;
     }
+
+    // Valida os dois dígitos verificadores
     for ($t = 9; $t < 11; $t++) {
-        for ($d = 0, $c = 0; $c < $t; $c++) {
+        $d = 0;
+        for ($c = 0; $c < $t; $c++) {
             $d += $cpf[$c] * (($t + 1) - $c);
         }
         $d = ((10 * $d) % 11) % 10;
+
         if ($cpf[$c] != $d) {
             return false;
         }
     }
+
     return true;
 }
 
-// Dados do formulário
-$nome = $_POST['nome'];
-$cpf = $_POST['cpf'];
-$email = $_POST['email'];
-$telefone = $_POST['telefone'];
-$endereco = $_POST['endereco'];
-$cidade = $_POST['cidade'];
-$estado = $_POST['estado'];
-$cep = $_POST['cep'];
-$valor = $_POST['valor'];
-$vencimento = $_POST['vencimento'];
+/**
+ * Valida os dados do formulário
+ * 
+ * @param array $dados Dados do formulário
+ * @return void Retorna erro e finaliza o script caso algum dado seja inválido
+ */
+function validarFormulario($dados)
+{
+    if (!validarCPF($dados['cpf'])) {
+        die("CPF inválido.");
+    }
 
-// Validação dos campos em PHP
-if (!validarCPF($cpf)) {
-    die("CPF inválido.");
+    if ($dados['valor'] <= 0) {
+        die("O valor do boleto deve ser maior que zero.");
+    }
+
+    if ($dados['vencimento'] < date('Y-m-d')) {
+        die("A data de vencimento deve ser posterior à data atual.");
+    }
 }
 
-if ($valor <= 0) {
-    die("O valor do boleto deve ser maior que zero.");
+/**
+ * Cria um objeto do tipo Agente (cliente ou beneficiário)
+ * 
+ * @param array $dados Dados para a criação do agente
+ * @return Agente
+ */
+function criarAgente($dados)
+{
+    return new Agente(
+        $dados['nome'],
+        $dados['cpf'],
+        $dados['endereco'],
+        $dados['cidade'],
+        $dados['estado'],
+        $dados['cep']
+    );
 }
 
-if ($vencimento < date('Y-m-d')) {
-    die("A data de vencimento deve ser posterior à data atual.");
-}
-
-// Criando o pagador (Cliente)
-$pagador = new Agente(
-    $nome,
-    $cpf,
-    $endereco,
-    $cidade,
-    $estado,
-    $cep
-);
-
-// Criando o beneficiário (Empresa)
-$beneficiario = new Agente(
-    'Minha Empresa LTDA',
-    '12.345.678/0001-00',
-    'Rua Exemplo, 123',
-    'Cidade',
-    'UF',
-    '12345-678'
-);
-
-// Configuração e geração do boleto do Bradesco
-$boleto = new Bradesco(array(
-    'dataVencimento' => new DateTime($vencimento),
-    'valor' => (float)$valor,
-    'sequencial' => 1234567,
-    'sacado' => $pagador,
-    'cedente' => $beneficiario,
-    'agencia' => 1234,
-    'carteira' => 06,
-    'conta' => 56789,
-    'convenio' => 123456,
-));
-
-// Gerar HTML do boleto
-$htmlBoleto = '<!DOCTYPE html>
+/**
+ * Gera o HTML do boleto
+ * 
+ * @param Bradesco $boleto Instância do boleto
+ * @return string HTML do boleto
+ */
+function gerarHtmlBoleto($boleto)
+{
+    return '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -93,10 +93,68 @@ $htmlBoleto = '<!DOCTYPE html>
 </head>
 <body>' . $boleto->getOutput() . '</body>
 </html>';
+}
+
+/**
+ * Gera o PDF do boleto e o exibe no navegador
+ * 
+ * @param string $html HTML do boleto
+ * @return void
+ */
+function gerarPdfBoleto($html)
+{
+    $dompdf = new Dompdf();
+    $dompdf->loadHtml($html);
+    $dompdf->setPaper('A4', 'portrait');
+    $dompdf->render();
+    $dompdf->stream("boleto_bradesco.pdf", array("Attachment" => false));
+}
+
+// Dados do formulário
+$dadosFormulario = [
+    'nome'       => $_POST['nome'],
+    'cpf'        => $_POST['cpf'],
+    'email'      => $_POST['email'],
+    'telefone'   => $_POST['telefone'],
+    'endereco'   => $_POST['endereco'],
+    'cidade'     => $_POST['cidade'],
+    'estado'     => $_POST['estado'],
+    'cep'        => $_POST['cep'],
+    'valor'      => $_POST['valor'],
+    'vencimento' => $_POST['vencimento']
+];
+
+// Validação dos campos em PHP
+validarFormulario($dadosFormulario);
+
+// Criando o pagador (Cliente)
+$pagador = criarAgente($dadosFormulario);
+
+// Criando o beneficiário (Empresa)
+$beneficiario = criarAgente([
+    'nome'     => 'Minha Empresa LTDA',
+    'cpf'      => '12.345.678/0001-00',
+    'endereco' => 'Rua Exemplo, 123',
+    'cidade'   => 'Cidade',
+    'estado'   => 'UF',
+    'cep'      => '12345-678'
+]);
+
+// Configuração e geração do boleto do Bradesco
+$boleto = new Bradesco([
+    'dataVencimento' => new DateTime($dadosFormulario['vencimento']),
+    'valor'          => (float) $dadosFormulario['valor'],
+    'sequencial'     => 1234567,
+    'sacado'         => $pagador,
+    'cedente'        => $beneficiario,
+    'agencia'        => 1234,
+    'carteira'       => 06,
+    'conta'          => 56789,
+    'convenio'       => 123456,
+]);
+
+// Gerar HTML do boleto
+$htmlBoleto = gerarHtmlBoleto($boleto);
 
 // Geração do PDF
-$dompdf = new Dompdf();
-$dompdf->loadHtml($htmlBoleto);
-$dompdf->setPaper('A4', 'portrait');
-$dompdf->render();
-$dompdf->stream("boleto_bradesco.pdf", array("Attachment" => false));
+gerarPdfBoleto($htmlBoleto);
